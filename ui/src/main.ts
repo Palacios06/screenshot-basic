@@ -24,6 +24,11 @@ class ScreenshotRequest {
 
     targetURL: string;
     targetField: string;
+    aspectRatio: number; // New property for aspect ratio
+
+    constructor() {
+        this.aspectRatio = 0; // Default aspect ratio is 16:9
+    }
 }
 
 // from https://stackoverflow.com/a/12300351
@@ -33,12 +38,12 @@ function dataURItoBlob(dataURI: string) {
 
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
-
+  
     for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
     }
-
-    const blob = new Blob([ab], { type: mimeString });
+  
+    const blob = new Blob([ab], {type: mimeString});
     return blob;
 }
 
@@ -51,65 +56,53 @@ class ScreenshotUI {
     request: ScreenshotRequest;
 
     initialize() {
-        window.addEventListener('message', (event) => {
+        window.addEventListener('message', event => {
             this.request = event.data.request;
         });
 
-        window.addEventListener('resize', (event) => {
+        window.addEventListener('resize', event => {
             this.resize();
         });
 
-        const cameraRTT: any = new OrthographicCamera(
-            window.innerWidth / -2,
-            window.innerWidth / 2,
-            window.innerHeight / 2,
-            window.innerHeight / -2,
-            -10000,
-            10000
-        );
+        const cameraRTT: any = new OrthographicCamera( window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, -10000, 10000 );
         cameraRTT.position.z = 100;
 
         const sceneRTT: any = new Scene();
 
-        const rtTexture = new WebGLRenderTarget(window.innerWidth, window.innerHeight, {
-            minFilter: LinearFilter,
-            magFilter: NearestFilter,
-            format: RGBAFormat,
-            type: UnsignedByteType
-        });
-        const gameTexture: any = new CfxTexture();
+        const rtTexture = new WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: LinearFilter, magFilter: NearestFilter, format: RGBAFormat, type: UnsignedByteType } );
+        const gameTexture: any = new CfxTexture( );
         gameTexture.needsUpdate = true;
 
-        const material = new ShaderMaterial({
-            uniforms: { tDiffuse: { value: gameTexture } },
+        const material = new ShaderMaterial( {
+            uniforms: { "tDiffuse": { value: gameTexture } },
             vertexShader: `
-              varying vec2 vUv;
-  
-              void main() {
-                  vUv = vec2(uv.x, 1.0-uv.y); // fuck gl uv coords
-                  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-              }
-  `,
+            varying vec2 vUv;
+            
+            void main() {
+                vUv = vec2(uv.x, 1.0-uv.y); // flip gl uv coords
+                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+            }
+            `,
             fragmentShader: `
-              varying vec2 vUv;
-              uniform sampler2D tDiffuse;
-  
-              void main() {
-                  gl_FragColor = texture2D( tDiffuse, vUv );
-              }
-  `
-        });
+            varying vec2 vUv;
+            uniform sampler2D tDiffuse;
+            
+            void main() {
+                gl_FragColor = texture2D( tDiffuse, vUv );
+            }
+            `
+        } );
 
         this.material = material;
 
-        const plane = new PlaneBufferGeometry(window.innerWidth, window.innerHeight);
-        const quad: any = new Mesh(plane, material);
+        const plane = new PlaneBufferGeometry( window.innerWidth, window.innerHeight );
+        const quad: any = new Mesh( plane, material );
         quad.position.z = -100;
-        sceneRTT.add(quad);
+        sceneRTT.add( quad );
 
         const renderer = new WebGLRenderer();
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
         renderer.autoClear = false;
 
         document.getElementById('app').appendChild(renderer.domElement);
@@ -126,39 +119,23 @@ class ScreenshotUI {
     }
 
     resize() {
-        const aspectRatio = 1;
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        const cameraRTT: any = new OrthographicCamera(
-            width / -2,
-            width / 2,
-            height / 2,
-            height / -2,
-            -10000,
-            10000
-        );
+        const cameraRTT: any = new OrthographicCamera( window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, -10000, 10000 );
         cameraRTT.position.z = 100;
 
         this.cameraRTT = cameraRTT;
 
         const sceneRTT: any = new Scene();
 
-        const plane = new PlaneBufferGeometry(width, height);
-        const quad: any = new Mesh(plane, this.material);
+        const plane = new PlaneBufferGeometry( window.innerWidth, window.innerHeight );
+        const quad: any = new Mesh( plane, this.material );
         quad.position.z = -100;
-        sceneRTT.add(quad);
+        sceneRTT.add( quad );
 
         this.sceneRTT = sceneRTT;
 
-        this.rtTexture = new WebGLRenderTarget(width, height, {
-            minFilter: LinearFilter,
-            magFilter: NearestFilter,
-            format: RGBAFormat,
-            type: UnsignedByteType
-        });
+        this.rtTexture = new WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: LinearFilter, magFilter: NearestFilter, format: RGBAFormat, type: UnsignedByteType } );
 
-        this.renderer.setSize(width, height);
+        this.renderer.setSize( window.innerWidth, window.innerHeight );
     }
 
     animate() {
@@ -176,33 +153,30 @@ class ScreenshotUI {
     }
 
     handleRequest(request: ScreenshotRequest) {
-        // Calculate the dimensions for the 1:1 ratio
+        // Determine the target size based on the aspect ratio
+
         const minDimension = Math.min(window.innerWidth, window.innerHeight);
-        const width = minDimension;
-        const height = minDimension;
+
+        const targetWidth = request.aspectRatio === 1 ? minDimension : window.innerWidth;
+        const targetHeight = window.innerHeight === 1 ? minDimension : window.innerHeight;
+
+        const offsetX = request.aspectRatio === 1 ? (window.innerWidth - targetWidth) / 2 : 0;
+        const offsetY = request.aspectRatio === 1 ? (window.innerHeight - targetHeight) / 2 : 0;
 
         // read the screenshot
-        const read = new Uint8Array(width * height * 4);
-        this.renderer.readRenderTargetPixels(
-            this.rtTexture,
-            0,
-            0,
-            width,
-            height,
-            read
-        );
+        const read = new Uint8Array(targetWidth * targetHeight * 4);
+        this.renderer.readRenderTargetPixels(this.rtTexture, offsetX, offsetY, targetWidth, targetHeight, read);
 
         // create a temporary canvas to compress the image
         const canvas = document.createElement('canvas');
         canvas.style.display = 'inline';
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
 
         // draw the image on the canvas
         const d = new Uint8ClampedArray(read.buffer);
-
         const cxt = canvas.getContext('2d');
-        cxt.putImageData(new ImageData(d, width, height), 0, 0);
+        cxt.putImageData(new ImageData(d, targetWidth, targetHeight), 0, 0);
 
         // encode the image
         let type = 'image/png';
@@ -228,11 +202,7 @@ class ScreenshotUI {
 
         const getFormData = () => {
             const formData = new FormData();
-            formData.append(
-                request.targetField,
-                dataURItoBlob(imageURL),
-                `screenshot.${request.encoding}`
-            );
+            formData.append(request.targetField, dataURItoBlob(imageURL), `screenshot.${request.encoding}`);
 
             return formData;
         };
@@ -242,18 +212,24 @@ class ScreenshotUI {
             method: 'POST',
             mode: 'cors',
             headers: request.headers,
-            body: request.targetField ? getFormData() : JSON.stringify({ data: imageURL, id: request.correlation })
+            body: (request.targetField) ? getFormData() : JSON.stringify({
+                data: imageURL,
+                id: request.correlation
+            })
         })
-            .then((response) => response.text())
-            .then((text) => {
-                if (request.resultURL) {
-                    fetch(request.resultURL, {
-                        method: 'POST',
-                        mode: 'cors',
-                        body: JSON.stringify({ data: text, id: request.correlation })
-                    });
-                }
-            });
+        .then(response => response.text())
+        .then(text => {
+            if (request.resultURL) {
+                fetch(request.resultURL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    body: JSON.stringify({
+                        data: text,
+                        id: request.correlation
+                    })
+                });
+            }
+        });
     }
 }
 
